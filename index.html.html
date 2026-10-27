@@ -1,0 +1,1429 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nós Dois — Começando do Zero (100% Editável & localStorage)</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            midnight: {
+              950: '#070C16',
+              900: '#0D1726',
+              800: '#132238',
+              700: '#1C314F',
+              600: '#274268',
+            },
+            mint: {
+              400: '#6EE7B7',
+              300: '#86EFAC',
+              200: '#A7F3D0',
+              500: '#34D399',
+            },
+            offwhite: '#F4F7FB',
+            slateish: '#94A6C1',
+            coral: '#FCA5A5',
+            amberish: '#FCD34D',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    * {
+      -webkit-tap-highlight-color: transparent;
+      box-sizing: border-box;
+    }
+    body {
+      background: radial-gradient(circle at 50% 0%, #162844 0%, #070C16 78%);
+      color: #F4F7FB;
+      min-height: 100vh;
+    }
+    .glass-card {
+      background: rgba(23, 39, 64, 0.62);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(148, 166, 193, 0.14);
+      box-shadow: 0 12px 32px -8px rgba(4, 9, 20, 0.55);
+    }
+    .glass-subtle {
+      background: rgba(28, 49, 79, 0.38);
+      border: 1px solid rgba(148, 166, 193, 0.10);
+    }
+    .glass-pill {
+      background: rgba(110, 231, 183, 0.12);
+      border: 1px solid rgba(110, 231, 183, 0.28);
+    }
+    .tactile-btn {
+      transition: transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease;
+    }
+    .tactile-btn:active {
+      transform: scale(0.95);
+    }
+    .tab-fade {
+      animation: fadeSlideUp 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    @keyframes fadeSlideUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .donut-ring {
+      transition: stroke-dasharray 0.6s cubic-bezier(0.22, 1, 0.36, 1), stroke-dashoffset 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .progress-fill {
+      transition: width 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .phone-frame {
+      box-shadow: 0 25px 70px -15px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.08);
+    }
+    .editable-hover {
+      cursor: pointer;
+      border-bottom: 1px dashed rgba(110, 231, 183, 0.45);
+      transition: all 0.15s ease;
+    }
+    .editable-hover:hover {
+      color: #6EE7B7;
+      border-bottom-color: #6EE7B7;
+      background: rgba(110, 231, 183, 0.12);
+      border-radius: 4px;
+      padding-inline: 3px;
+    }
+  </style>
+</head>
+<body class="antialiased selection:bg-mint-400 selection:text-midnight-950 py-0 sm:py-4 px-0 sm:px-4 flex flex-col items-center justify-start">
+
+  <div id="appRoot" class="w-full flex flex-col items-center"></div>
+
+  <script>
+    // =========================================================================
+    // VERSÃO "COMEÇANDO DO ZERO" (100% Editável + Assistente Inicial + localStorage)
+    // =========================================================================
+    const STORAGE_KEY = 'nos_dois_fresh_start_v1';
+
+    const MONTH_NAMES = [
+      { num: '01', short: 'Jan', full: 'Janeiro' },
+      { num: '02', short: 'Fev', full: 'Fevereiro' },
+      { num: '03', short: 'Mar', full: 'Março' },
+      { num: '04', short: 'Abr', full: 'Abril' },
+      { num: '05', short: 'Mai', full: 'Maio' },
+      { num: '06', short: 'Jun', full: 'Junho' },
+      { num: '07', short: 'Jul', full: 'Julho' },
+      { num: '08', short: 'Ago', full: 'Agosto' },
+      { num: '09', short: 'Set', full: 'Setembro' },
+      { num: '10', short: 'Out', full: 'Outubro' },
+      { num: '11', short: 'Nov', full: 'Novembro' },
+      { num: '12', short: 'Dez', full: 'Dezembro' }
+    ];
+
+    function getBlankInitialData() {
+      const now = new Date();
+      const year = now.getFullYear();
+      const monthIdx = now.getMonth();
+      const meta = MONTH_NAMES[monthIdx];
+      const currentKey = `${year}-${meta.num}`;
+
+      return {
+        onboardingCompleted: false,
+        partner1: 'Parceiro(a) 1',
+        partner2: 'Parceiro(a) 2',
+        targetSplitP1: 50,
+        privacyMode: false,
+        activeTab: 'home',
+        activeMonthKey: currentKey,
+        expenseSubfilter: 'fixed',
+        splitFilter: 'all',
+        goals: [],
+        months: {
+          [currentKey]: {
+            label: meta.short,
+            fullName: meta.full,
+            year,
+            status: 'current',
+            ceiling: 0,
+            categoryBudgets: {
+              Moradia: 0,
+              Mercado: 0,
+              Lazer: 0,
+              Assinaturas: 0,
+              Imprevistos: 0
+            },
+            incomes: [],
+            expenses: []
+          }
+        }
+      };
+    }
+
+    let state = (() => {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) return JSON.parse(saved);
+      } catch (e) {}
+      return getBlankInitialData();
+    })();
+
+    let uiState = {
+      editingKey: null,
+      txModalOpen: false,
+      coupleModalOpen: false,
+      goalModalOpen: false,
+      genMonthModalOpen: false,
+      txType: 'expense',
+      txSplit: '50/50',
+      txSubType: 'fixed',
+      onbSplitPreview: 50,
+      toastMsg: null
+    };
+
+    function setState(updater) {
+      state = typeof updater === 'function' ? updater(state) : { ...state, ...updater };
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      } catch (e) {}
+      renderApp();
+    }
+
+    function setUI(updater) {
+      uiState = { ...uiState, ...(typeof updater === 'function' ? updater(uiState) : updater) };
+      renderApp();
+    }
+
+    function showToast(msg) {
+      uiState.toastMsg = msg;
+      renderApp();
+      setTimeout(() => {
+        if (uiState.toastMsg === msg) {
+          uiState.toastMsg = null;
+          renderApp();
+        }
+      }, 2500);
+    }
+
+    function formatBRL(val) {
+      if (state.privacyMode) return 'R$ ••••';
+      return Number(val || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
+
+    function getNextMonthMeta() {
+      const keys = Object.keys(state.months).sort();
+      const lastKey = keys[keys.length - 1];
+      const [yStr, mStr] = lastKey.split('-');
+      let year = parseInt(yStr, 10);
+      let mIdx = parseInt(mStr, 10);
+      if (mIdx === 12) { mIdx = 1; year += 1; } else { mIdx += 1; }
+      const meta = MONTH_NAMES[mIdx - 1];
+      return { key: `${year}-${meta.num}`, year, label: meta.short, fullName: meta.full };
+    }
+
+    function computeMetrics(monthKey = state.activeMonthKey) {
+      const m = state.months[monthKey] || state.months[Object.keys(state.months)[0]];
+      const totalIncomeP1 = m.incomes.filter(i => i.partner === 'P1').reduce((a, b) => a + Number(b.amount), 0);
+      const totalIncomeP2 = m.incomes.filter(i => i.partner === 'P2').reduce((a, b) => a + Number(b.amount), 0);
+      const totalIncome = totalIncomeP1 + totalIncomeP2;
+
+      const fixedExpenses = m.expenses.filter(e => e.type === 'fixed');
+      const variableExpenses = m.expenses.filter(e => e.type === 'variable');
+
+      const totalFixed = fixedExpenses.reduce((a, b) => a + Number(b.amount), 0);
+      const totalVariable = variableExpenses.reduce((a, b) => a + Number(b.amount), 0);
+      const totalExpense = totalFixed + totalVariable;
+
+      const balance = totalIncome - totalExpense;
+      const fixedPct = totalExpense > 0 ? Math.round((totalFixed / totalExpense) * 100) : 0;
+      const variablePct = totalExpense > 0 ? 100 - fixedPct : 0;
+
+      let p1Responsibility = 0;
+      let p2Responsibility = 0;
+      const p1Ratio = state.targetSplitP1 / 100;
+      const p2Ratio = 1 - p1Ratio;
+
+      m.expenses.forEach(e => {
+        const amt = Number(e.amount);
+        if (e.split === '50/50') {
+          p1Responsibility += amt * 0.5;
+          p2Responsibility += amt * 0.5;
+        } else if (e.split === 'proportional') {
+          p1Responsibility += amt * p1Ratio;
+          p2Responsibility += amt * p2Ratio;
+        } else {
+          if (e.payer === 'P1') p1Responsibility += amt;
+          else p2Responsibility += amt;
+        }
+      });
+
+      return {
+        m, totalIncomeP1, totalIncomeP2, totalIncome,
+        fixedExpenses, variableExpenses, totalFixed, totalVariable,
+        totalExpense, balance, fixedPct, variablePct,
+        p1Responsibility, p2Responsibility
+      };
+    }
+
+    // Inline Editing Components
+    function renderInlineNumber(editKey, currentValue, onCommitCallbackName, prefix = '', extraClass = '') {
+      if (state.privacyMode) return `<span class="${extraClass}">${prefix}R$ ••••</span>`;
+      if (uiState.editingKey === editKey) {
+        return `<input
+          id="inline_input_${editKey}"
+          type="number"
+          step="0.01"
+          value="${currentValue}"
+          onblur="${onCommitCallbackName}(this.value)"
+          onkeydown="if(event.key==='Enter') this.blur(); if(event.key==='Escape') cancelInlineEdit();"
+          onclick="event.stopPropagation()"
+          class="w-24 rounded-lg bg-midnight-950 border border-mint-400 px-2 py-0.5 text-xs text-offwhite focus:outline-none"
+        />`;
+      }
+      return `<span
+        onclick="event.stopPropagation(); startInlineEdit('${editKey}')"
+        title="Clique para editar este valor"
+        class="editable-hover ${extraClass}"
+      >${prefix}${formatBRL(currentValue)}</span>`;
+    }
+
+    function renderInlineText(editKey, currentText, onCommitCallbackName, extraClass = '') {
+      if (uiState.editingKey === editKey) {
+        return `<input
+          id="inline_input_${editKey}"
+          type="text"
+          value="${currentText.replace(/"/g, '&quot;')}"
+          onblur="${onCommitCallbackName}(this.value)"
+          onkeydown="if(event.key==='Enter') this.blur(); if(event.key==='Escape') cancelInlineEdit();"
+          onclick="event.stopPropagation()"
+          class="w-28 rounded-lg bg-midnight-950 border border-mint-400 px-2 py-0.5 text-xs text-offwhite focus:outline-none"
+        />`;
+      }
+      return `<span
+        onclick="event.stopPropagation(); startInlineEdit('${editKey}')"
+        title="Clique para editar o nome"
+        class="editable-hover ${extraClass}"
+      >${currentText}</span>`;
+    }
+
+    window.startInlineEdit = function(key) {
+      setUI({ editingKey: key });
+      setTimeout(() => {
+        const el = document.getElementById(`inline_input_${key}`);
+        if (el) { el.focus(); el.select(); }
+      }, 20);
+    };
+
+    window.cancelInlineEdit = function() {
+      setUI({ editingKey: null });
+    };
+
+    window.commitPartnerName = function(which, val) {
+      uiState.editingKey = null;
+      const trimmed = String(val).trim();
+      if (trimmed) {
+        setState(prev => ({ ...prev, [which]: trimmed }));
+        showToast('Nome atualizado!');
+      } else { renderApp(); }
+    };
+
+    window.commitCeilingEdit = function(val) {
+      const num = parseFloat(val);
+      uiState.editingKey = null;
+      if (!isNaN(num) && num >= 0) {
+        const mKey = state.activeMonthKey;
+        setState(prev => ({
+          ...prev,
+          months: { ...prev.months, [mKey]: { ...prev.months[mKey], ceiling: num } }
+        }));
+        showToast('Teto mensal atualizado!');
+      } else { renderApp(); }
+    };
+
+    window.commitIncomeField = function(incId, field, val) {
+      uiState.editingKey = null;
+      const mKey = state.activeMonthKey;
+      const parsed = field === 'amount' ? parseFloat(val) : String(val).trim();
+      if (field === 'amount' && (isNaN(parsed) || parsed < 0)) { renderApp(); return; }
+      if (field === 'title' && !parsed) { renderApp(); return; }
+
+      setState(prev => ({
+        ...prev,
+        months: {
+          ...prev.months,
+          [mKey]: {
+            ...prev.months[mKey],
+            incomes: prev.months[mKey].incomes.map(i => i.id === incId ? { ...i, [field]: parsed } : i)
+          }
+        }
+      }));
+      showToast('Entrada recalculada em tempo real!');
+    };
+
+    window.commitExpenseField = function(expId, field, val) {
+      uiState.editingKey = null;
+      const mKey = state.activeMonthKey;
+      const parsed = field === 'amount' ? parseFloat(val) : String(val).trim();
+      if (field === 'amount' && (isNaN(parsed) || parsed < 0)) { renderApp(); return; }
+      if (field === 'title' && !parsed) { renderApp(); return; }
+
+      setState(prev => ({
+        ...prev,
+        months: {
+          ...prev.months,
+          [mKey]: {
+            ...prev.months[mKey],
+            expenses: prev.months[mKey].expenses.map(e => e.id === expId ? { ...e, [field]: parsed } : e)
+          }
+        }
+      }));
+      showToast('Despesa recalculada em tempo real!');
+    };
+
+    window.commitGoalField = function(goalId, field, val) {
+      uiState.editingKey = null;
+      const parsed = (field === 'current' || field === 'target') ? parseFloat(val) : String(val).trim();
+      if ((field === 'current' || field === 'target') && (isNaN(parsed) || parsed < 0)) { renderApp(); return; }
+      if (field === 'title' && !parsed) { renderApp(); return; }
+
+      setState(prev => ({
+        ...prev,
+        goals: prev.goals.map(g => g.id === goalId ? { ...g, [field]: parsed } : g)
+      }));
+      showToast('Meta atualizada!');
+    };
+
+    // Onboarding Submit (Começando do zero)
+    window.handleOnboardingSubmit = function(e) {
+      e.preventDefault();
+      const p1 = document.getElementById('onbP1Input').value.trim() || 'Parceiro(a) 1';
+      const p2 = document.getElementById('onbP2Input').value.trim() || 'Parceiro(a) 2';
+      const split = parseInt(document.getElementById('onbSplitInput').value, 10) || 50;
+      const ceil = parseFloat(document.getElementById('onbCeilingInput').value) || 0;
+      const mKey = state.activeMonthKey;
+
+      setState(prev => ({
+        ...prev,
+        onboardingCompleted: true,
+        partner1: p1,
+        partner2: p2,
+        targetSplitP1: split,
+        months: {
+          ...prev.months,
+          [mKey]: { ...prev.months[mKey], ceiling: ceil }
+        }
+      }));
+      showToast(`Bem-vindos, ${p1} & ${p2}!`);
+    };
+
+    // Interactive Actions
+    window.toggleExpensePaid = function(expId) {
+      const mKey = state.activeMonthKey;
+      const target = state.months[mKey].expenses.find(e => e.id === expId);
+      const nextPaid = target ? !target.paid : true;
+      setState(prev => ({
+        ...prev,
+        months: {
+          ...prev.months,
+          [mKey]: {
+            ...prev.months[mKey],
+            expenses: prev.months[mKey].expenses.map(e => e.id === expId ? { ...e, paid: nextPaid } : e)
+          }
+        }
+      }));
+      showToast(nextPaid ? `✓ "${target.title}" paga!` : `"${target.title}" pendente.`);
+    };
+
+    window.cycleExpenseSplit = function(expId) {
+      const order = ['50/50', 'proportional', 'individual'];
+      const mKey = state.activeMonthKey;
+      setState(prev => ({
+        ...prev,
+        months: {
+          ...prev.months,
+          [mKey]: {
+            ...prev.months[mKey],
+            expenses: prev.months[mKey].expenses.map(e => {
+              if (e.id !== expId) return e;
+              const nextSplit = order[(order.indexOf(e.split) + 1) % order.length];
+              return { ...e, split: nextSplit };
+            })
+          }
+        }
+      }));
+      showToast('Regra de divisão alterada!');
+    };
+
+    window.toggleIncomePartner = function(incId) {
+      const mKey = state.activeMonthKey;
+      setState(prev => ({
+        ...prev,
+        months: {
+          ...prev.months,
+          [mKey]: {
+            ...prev.months[mKey],
+            incomes: prev.months[mKey].incomes.map(i => i.id === incId ? { ...i, partner: i.partner === 'P1' ? 'P2' : 'P1' } : i)
+          }
+        }
+      }));
+      showToast('Parceiro da entrada alternado!');
+    };
+
+    window.deleteIncome = function(incId) {
+      const mKey = state.activeMonthKey;
+      setState(prev => ({
+        ...prev,
+        months: {
+          ...prev.months,
+          [mKey]: { ...prev.months[mKey], incomes: prev.months[mKey].incomes.filter(i => i.id !== incId) }
+        }
+      }));
+      showToast('Entrada removida');
+    };
+
+    window.deleteExpense = function(expId) {
+      const mKey = state.activeMonthKey;
+      setState(prev => ({
+        ...prev,
+        months: {
+          ...prev.months,
+          [mKey]: { ...prev.months[mKey], expenses: prev.months[mKey].expenses.filter(e => e.id !== expId) }
+        }
+      }));
+      showToast('Despesa removida');
+    };
+
+    window.deleteGoal = function(goalId) {
+      setState(prev => ({
+        ...prev,
+        goals: prev.goals.filter(g => g.id !== goalId)
+      }));
+      showToast('Meta removida');
+    };
+
+    window.contributeGoal = function(goalId, amt) {
+      setState(prev => ({
+        ...prev,
+        goals: prev.goals.map(g => g.id === goalId ? { ...g, current: Math.min(g.target, g.current + amt) } : g)
+      }));
+      showToast(`+${formatBRL(amt)} guardados!`);
+    };
+
+    window.handleNewTxSubmit = function(e) {
+      e.preventDefault();
+      const title = document.getElementById('txTitleInput').value.trim();
+      const amount = parseFloat(document.getElementById('txAmountInput').value);
+      const partner = document.getElementById('txPartnerInput').value;
+      if (!title || isNaN(amount) || amount <= 0) return;
+
+      const mKey = state.activeMonthKey;
+      const m = state.months[mKey];
+
+      if (uiState.txType === 'income') {
+        const newInc = { id: 'inc_' + Date.now(), title, amount, partner, date: `Hoje • ${m.label}` };
+        uiState.txModalOpen = false;
+        setState(prev => ({
+          ...prev,
+          activeTab: 'income',
+          months: {
+            ...prev.months,
+            [mKey]: { ...prev.months[mKey], incomes: [newInc, ...prev.months[mKey].incomes] }
+          }
+        }));
+        showToast('Entrada cadastrada!');
+      } else {
+        const category = document.getElementById('txCategoryInput').value;
+        const dueDay = parseInt(document.getElementById('txDueDayInput')?.value || '10', 10);
+        const paid = (document.getElementById('txPaidInput')?.value || 'pending') === 'paid';
+        const newExp = {
+          id: 'exp_' + Date.now(), title, amount,
+          type: uiState.txSubType, category, split: uiState.txSplit,
+          payer: partner, paid: uiState.txSubType === 'fixed' ? paid : true,
+          dueDay: uiState.txSubType === 'fixed' ? dueDay : null,
+          date: `Hoje • ${m.label}`
+        };
+        uiState.txModalOpen = false;
+        setState(prev => ({
+          ...prev,
+          activeTab: 'expenses',
+          expenseSubfilter: uiState.txSubType,
+          months: {
+            ...prev.months,
+            [mKey]: { ...prev.months[mKey], expenses: [newExp, ...prev.months[mKey].expenses] }
+          }
+        }));
+        showToast('Despesa cadastrada!');
+      }
+    };
+
+    window.handleCoupleSubmit = function(e) {
+      e.preventDefault();
+      const p1 = document.getElementById('cpP1Input').value.trim() || 'Parceiro(a) 1';
+      const p2 = document.getElementById('cpP2Input').value.trim() || 'Parceiro(a) 2';
+      const sp = parseInt(document.getElementById('cpSplitInput').value, 10) || 50;
+      const ceil = parseFloat(document.getElementById('cpCeilInput').value) || 0;
+      const mKey = state.activeMonthKey;
+      uiState.coupleModalOpen = false;
+      setState(prev => ({
+        ...prev,
+        partner1: p1,
+        partner2: p2,
+        targetSplitP1: sp,
+        months: {
+          ...prev.months,
+          [mKey]: { ...prev.months[mKey], ceiling: ceil }
+        }
+      }));
+      showToast('Nomes e acordo atualizados!');
+    };
+
+    window.handleGoalSubmit = function(e) {
+      e.preventDefault();
+      const title = document.getElementById('glTitleInput').value.trim();
+      const target = parseFloat(document.getElementById('glTargetInput').value);
+      const current = parseFloat(document.getElementById('glCurrentInput').value) || 0;
+      const deadline = document.getElementById('glDeadlineInput').value.trim() || 'Sem prazo';
+      if (!title || isNaN(target) || target <= 0) return;
+
+      uiState.goalModalOpen = false;
+      setState(prev => ({
+        ...prev,
+        goals: [...prev.goals, { id: 'g_' + Date.now(), title, icon: '✨', current, target, deadline }]
+      }));
+      showToast('Meta adicionada!');
+    };
+
+    window.handleGenMonthSubmit = function(e) {
+      e.preventDefault();
+      const cloneFixed = document.getElementById('gmCloneFixed').checked;
+      const cloneIncome = document.getElementById('gmCloneIncome').checked;
+      const nextMeta = getNextMonthMeta();
+      const baseMonth = state.months[state.activeMonthKey];
+
+      const newIncomes = [];
+      if (cloneIncome) {
+        baseMonth.incomes.forEach((inc, idx) => {
+          newIncomes.push({
+            id: `inc_${nextMeta.key}_${idx}_${Date.now()}`,
+            title: inc.title,
+            amount: inc.amount,
+            partner: inc.partner,
+            date: `Previsto • ${nextMeta.label}`
+          });
+        });
+      }
+
+      const newExpenses = [];
+      if (cloneFixed) {
+        baseMonth.expenses.filter(ex => ex.type === 'fixed').forEach((item, idx) => {
+          newExpenses.push({
+            id: `exp_${nextMeta.key}_fix_${idx}_${Date.now()}`,
+            title: item.title,
+            amount: item.amount,
+            type: 'fixed',
+            category: item.category || 'Moradia',
+            split: item.split || '50/50',
+            payer: item.payer || 'P1',
+            paid: false,
+            dueDay: item.dueDay || 10
+          });
+        });
+      }
+
+      uiState.genMonthModalOpen = false;
+      setState(prev => ({
+        ...prev,
+        activeMonthKey: nextMeta.key,
+        months: {
+          ...prev.months,
+          [nextMeta.key]: {
+            label: nextMeta.label,
+            fullName: nextMeta.fullName,
+            year: nextMeta.year,
+            status: 'future',
+            ceiling: baseMonth.ceiling || 0,
+            categoryBudgets: { ...baseMonth.categoryBudgets },
+            incomes: newIncomes,
+            expenses: newExpenses
+          }
+        }
+      }));
+      showToast(`✨ ${nextMeta.fullName} ${nextMeta.year} criado!`);
+    };
+
+    window.resetToZero = function() {
+      localStorage.removeItem(STORAGE_KEY);
+      state = getBlankInitialData();
+      uiState.onbSplitPreview = 50;
+      renderApp();
+      showToast('Aplicativo zerado para novo começo!');
+    };
+
+    // =========================================================================
+    // RENDERIZADOR PRINCIPAL
+    // =========================================================================
+    function renderApp() {
+      const root = document.getElementById('appRoot');
+      const nextMeta = getNextMonthMeta();
+      const data = computeMetrics();
+      const {
+        m, totalIncomeP1, totalIncomeP2, totalIncome,
+        fixedExpenses, variableExpenses, totalFixed, totalVariable,
+        totalExpense, balance, fixedPct, variablePct,
+        p1Responsibility, p2Responsibility
+      } = data;
+
+      const remainingCeiling = Math.max(0, m.ceiling - totalExpense);
+      const ceilingPct = m.ceiling > 0 ? Math.min(100, Math.round((totalExpense / m.ceiling) * 100)) : 0;
+      const circumference = 289;
+      const fixedStroke = Math.round((fixedPct / 100) * circumference);
+      const realP1Pct = totalIncome > 0 ? Math.round((totalIncomeP1 / totalIncome) * 100) : 50;
+      const realP2Pct = totalIncome > 0 ? 100 - realP1Pct : 50;
+
+      const monthPillsHtml = Object.keys(state.months).sort().map(key => {
+        const item = state.months[key];
+        const isSel = key === state.activeMonthKey;
+        return `
+          <button onclick="setState({ activeMonthKey: '${key}' })" class="tactile-btn px-3.5 py-1.5 rounded-full text-xs flex items-center gap-1.5 shrink-0 transition-all ${
+            isSel ? 'bg-mint-400 text-midnight-950 font-medium shadow-md shadow-mint-400/20' : 'glass-subtle text-slateish hover:text-offwhite'
+          }">
+            <span>${item.fullName} ${String(item.year).slice(-2)}</span>
+          </button>
+        `;
+      }).join('');
+
+      let tabContentHtml = '';
+
+      if (state.activeTab === 'home') {
+        const goalsHtml = state.goals.length === 0
+          ? `<div class="glass-subtle rounded-2xl p-5 text-center space-y-2">
+               <p class="text-xs text-slateish">Nenhuma meta cadastrada ainda.</p>
+               <button onclick="setUI({ goalModalOpen: true })" class="text-xs text-mint-300 underline">+ Criar nosso primeiro sonho a dois</button>
+             </div>`
+          : state.goals.map(g => {
+              const pct = Math.min(100, Math.round((g.current / g.target) * 100));
+              return `
+                <div class="glass-subtle rounded-2xl p-4 space-y-2.5">
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2.5">
+                      <span class="text-base">${g.icon}</span>
+                      <div>
+                        <h4 class="text-sm text-offwhite font-normal">
+                          ${renderInlineText(`goal_title_${g.id}`, g.title, `(v)=>commitGoalField('${g.id}','title',v)`)}
+                        </h4>
+                        <p class="text-xs text-slateish">
+                          Meta: ${renderInlineNumber(`goal_target_${g.id}`, g.target, `(v)=>commitGoalField('${g.id}','target',v)`)} • ${g.deadline}
+                        </p>
+                      </div>
+                    </div>
+                    <button onclick="contributeGoal('${g.id}', 100)" class="tactile-btn text-xs px-2.5 py-1 rounded-full glass-pill text-mint-300">+ R$ 100</button>
+                  </div>
+                  <div class="space-y-1">
+                    <div class="w-full h-2 bg-midnight-950/80 rounded-full overflow-hidden">
+                      <div class="h-full bg-mint-400 rounded-full progress-fill" style="width: ${pct}%"></div>
+                    </div>
+                    <div class="flex justify-between text-xs text-slateish">
+                      <span class="text-mint-300">${renderInlineNumber(`goal_curr_${g.id}`, g.current, `(v)=>commitGoalField('${g.id}','current',v)`)} guardados</span>
+                      <span>${pct}%</span>
+                    </div>
+                  </div>
+                </div>
+              `;
+            }).join('');
+
+        tabContentHtml = `
+          <section class="tab-fade space-y-6">
+            <div class="glass-card rounded-3xl p-6 relative overflow-hidden">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs text-slateish uppercase tracking-wider">Saldo Disponível do Casal</span>
+                <span class="text-xs px-2.5 py-0.5 rounded-full glass-pill text-mint-300">${m.fullName}</span>
+              </div>
+              <div class="text-3xl tracking-tight text-offwhite font-light mb-5">${formatBRL(balance)}</div>
+
+              <div class="grid grid-cols-2 gap-3 mb-5">
+                <div onclick="setUI({ txModalOpen: true, txType: 'income' })" class="cursor-pointer glass-subtle rounded-2xl p-3.5 flex items-center gap-3 hover:border-mint-400/40" title="Adicionar receita">
+                  <div class="w-8 h-8 rounded-xl bg-mint-400/15 text-mint-400 flex items-center justify-center shrink-0">↑</div>
+                  <div>
+                    <p class="text-xs text-slateish">Entradas (+)</p>
+                    <p class="text-sm text-mint-300">${formatBRL(totalIncome)}</p>
+                  </div>
+                </div>
+                <div onclick="setUI({ txModalOpen: true, txType: 'expense' })" class="cursor-pointer glass-subtle rounded-2xl p-3.5 flex items-center gap-3 hover:border-sky-400/40" title="Adicionar despesa">
+                  <div class="w-8 h-8 rounded-xl bg-sky-400/15 text-sky-300 flex items-center justify-center shrink-0">↓</div>
+                  <div>
+                    <p class="text-xs text-slateish">Saídas (+)</p>
+                    <p class="text-sm text-offwhite">${formatBRL(totalExpense)}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="space-y-2 pt-1 border-t border-white/[0.06]">
+                <div class="flex items-center justify-between text-xs pt-2">
+                  <span class="text-slateish">Teto mensal (clique p/ editar):</span>
+                  <span class="text-mint-300">
+                    ${renderInlineNumber('home_ceiling', m.ceiling, 'commitCeilingEdit', '', 'text-mint-300 font-medium')}
+                    ${m.ceiling > 0 ? `<span class="text-slateish"> (Restam ${formatBRL(remainingCeiling)})</span>` : ''}
+                  </span>
+                </div>
+                <div class="w-full h-2.5 bg-midnight-950/70 rounded-full overflow-hidden p-0.5">
+                  <div class="h-full bg-gradient-to-r from-mint-400 to-teal-300 rounded-full progress-fill" style="width: ${ceilingPct}%"></div>
+                </div>
+              </div>
+            </div>
+
+            ${totalIncome === 0 && totalExpense === 0 ? `
+              <div class="glass-card rounded-3xl p-6 space-y-4 border border-mint-400/30">
+                <div class="flex items-start gap-3.5">
+                  <div class="w-10 h-10 rounded-2xl bg-mint-400/15 text-mint-300 flex items-center justify-center shrink-0 text-lg">🌱</div>
+                  <div class="space-y-1">
+                    <h3 class="text-sm text-offwhite font-medium">Começando ${m.fullName} do zero</h3>
+                    <p className="text-xs text-slateish leading-relaxed">
+                      Adicione a primeira entrada ou despesa de <strong class="text-offwhite font-normal">${state.partner1} &amp; ${state.partner2}</strong> abaixo:
+                    </p>
+                  </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3 pt-1">
+                  <button onclick="setUI({ txModalOpen: true, txType: 'income' })" class="tactile-btn py-2.5 px-3 rounded-2xl glass-pill text-mint-300 text-xs font-medium">+ Adicionar Entrada</button>
+                  <button onclick="setUI({ txModalOpen: true, txType: 'expense' })" class="tactile-btn py-2.5 px-3 rounded-2xl glass-subtle text-offwhite text-xs font-medium">+ Adicionar Despesa</button>
+                </div>
+              </div>
+            ` : `
+              <div class="glass-card rounded-3xl p-5 border-l-4 border-l-mint-400">
+                <div class="flex items-start gap-3.5">
+                  <div class="w-9 h-9 rounded-2xl bg-mint-400/15 text-mint-300 flex items-center justify-center shrink-0 mt-0.5">✨</div>
+                  <div class="space-y-1">
+                    <h3 class="text-xs uppercase tracking-wider text-mint-300">Resumo Humanizado do Mês</h3>
+                    <p class="text-sm text-offwhite/95 leading-relaxed font-light">
+                      Em <strong class="text-mint-300 font-normal">${m.fullName}</strong>, ${state.partner1} &amp; ${state.partner2} registraram <strong class="text-offwhite font-normal">${formatBRL(totalIncome)}</strong> em entradas e <strong class="text-offwhite font-normal">${formatBRL(totalExpense)}</strong> em saídas (${fixedPct}% fixas / ${variablePct}% variáveis).
+                    </p>
+                  </div>
+                </div>
+              </div>
+            `}
+
+            <div class="glass-card rounded-3xl p-6">
+              <div class="flex items-center justify-between mb-5">
+                <div>
+                  <h3 class="text-base text-offwhite font-normal">Equilíbrio de Despesas</h3>
+                  <p class="text-xs text-slateish">Fixas vs. Variáveis em tempo real</p>
+                </div>
+                <button onclick="setState({ activeTab: 'expenses' })" class="tactile-btn text-xs text-mint-300">Gerenciar →</button>
+              </div>
+              <div class="flex items-center gap-6">
+                <div class="relative w-32 h-32 shrink-0 flex items-center justify-center">
+                  <svg class="w-32 h-32 -rotate-90" viewBox="0 0 120 120">
+                    <circle cx="60" cy="60" r="46" fill="transparent" stroke="rgba(148,166,193,0.12)" stroke-width="12" />
+                    ${totalExpense > 0 ? `
+                      <circle class="donut-ring" cx="60" cy="60" r="46" fill="transparent" stroke="#7DD3FC" stroke-width="12" stroke-linecap="round" stroke-dasharray="289" stroke-dashoffset="0" />
+                      <circle class="donut-ring" cx="60" cy="60" r="46" fill="transparent" stroke="#6EE7B7" stroke-width="12" stroke-linecap="round" stroke-dasharray="${fixedStroke} ${circumference}" stroke-dashoffset="0" />
+                    ` : ''}
+                  </svg>
+                  <div class="absolute inset-0 flex flex-col items-center justify-center text-center">
+                    <span class="text-xs text-slateish">Fixas</span>
+                    <span class="text-lg text-offwhite font-normal">${fixedPct}%</span>
+                  </div>
+                </div>
+                <div class="flex-1 space-y-3.5">
+                  <div class="glass-subtle rounded-2xl p-3">
+                    <div class="flex items-center justify-between text-xs mb-1">
+                      <span class="flex items-center gap-2 text-offwhite"><span class="w-2.5 h-2.5 rounded-full bg-mint-400"></span>Despesas Fixas</span>
+                      <span class="text-slateish">${fixedPct}%</span>
+                    </div>
+                    <p class="text-sm text-offwhite">${formatBRL(totalFixed)}</p>
+                  </div>
+                  <div class="glass-subtle rounded-2xl p-3">
+                    <div class="flex items-center justify-between text-xs mb-1">
+                      <span class="flex items-center gap-2 text-offwhite"><span class="w-2.5 h-2.5 rounded-full bg-sky-300"></span>Despesas Variáveis</span>
+                      <span class="text-slateish">${variablePct}%</span>
+                    </div>
+                    <p class="text-sm text-offwhite">${formatBRL(totalVariable)}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="glass-card rounded-3xl p-6 space-y-4">
+              <div class="flex items-center justify-between">
+                <div>
+                  <h3 class="text-base text-offwhite font-normal">Metas &amp; Sonhos a Dois</h3>
+                  <p class="text-xs text-slateish">Objetivos financeiros do casal</p>
+                </div>
+                <button onclick="setUI({ goalModalOpen: true })" class="tactile-btn text-xs px-3 py-1.5 rounded-full glass-pill text-mint-300">+ Nova meta</button>
+              </div>
+              <div class="space-y-3.5">${goalsHtml}</div>
+            </div>
+          </section>
+        `;
+      } else if (state.activeTab === 'income') {
+        const incomesListHtml = m.incomes.length === 0
+          ? `<div class="glass-subtle rounded-2xl p-6 text-center space-y-2">
+               <p class="text-xs text-slateish">Nenhuma entrada registrada neste mês.</p>
+               <button onclick="setUI({ txModalOpen: true, txType: 'income' })" class="text-xs text-mint-300 underline">+ Cadastrar primeira receita de ${state.partner1} ou ${state.partner2}</button>
+             </div>`
+          : m.incomes.map(inc => {
+              const isP1 = inc.partner === 'P1';
+              const pName = isP1 ? state.partner1 : state.partner2;
+              const badge = isP1 ? 'bg-mint-400/15 text-mint-300' : 'bg-sky-400/15 text-sky-300';
+              return `
+                <div class="glass-subtle rounded-2xl p-3.5 flex items-center justify-between gap-3">
+                  <div class="flex items-center gap-3">
+                    <button onclick="toggleIncomePartner('${inc.id}')" title="Alternar parceiro" class="w-9 h-9 rounded-xl ${badge} flex items-center justify-center text-xs font-medium shrink-0 tactile-btn">
+                      ${pName.charAt(0)}
+                    </button>
+                    <div>
+                      <p class="text-sm text-offwhite font-normal">
+                        ${renderInlineText(`inc_title_${inc.id}`, inc.title, `(v)=>commitIncomeField('${inc.id}','title',v)`)}
+                      </p>
+                      <p class="text-xs text-slateish">${pName} • ${inc.date}</p>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2.5">
+                    <span class="text-sm text-mint-300 font-normal">
+                      ${renderInlineNumber(`inc_amt_${inc.id}`, inc.amount, `(v)=>commitIncomeField('${inc.id}','amount',v)`, '+ ')}
+                    </span>
+                    <button onclick="deleteIncome('${inc.id}')" class="text-slateish/50 hover:text-coral text-xs px-1">✕</button>
+                  </div>
+                </div>
+              `;
+            }).join('');
+
+        tabContentHtml = `
+          <section class="tab-fade space-y-6">
+            <div class="glass-card rounded-3xl p-6 space-y-5">
+              <div class="flex items-start justify-between gap-2">
+                <div>
+                  <span class="text-xs text-mint-300 uppercase tracking-wider">Transparência &amp; Parceria</span>
+                  <h2 class="text-lg text-offwhite font-normal mt-0.5">Contribuição Justa</h2>
+                  <p class="text-xs text-slateish mt-0.5">Proporção real de entradas vs. meta combinada</p>
+                </div>
+                <button onclick="setUI({ coupleModalOpen: true })" class="tactile-btn text-xs px-3 py-1.5 rounded-full glass-subtle text-slateish hover:text-offwhite shrink-0">Ajustar acordo</button>
+              </div>
+              <div class="space-y-4">
+                <div class="space-y-2">
+                  <div class="flex items-center justify-between text-xs">
+                    <span class="text-offwhite">${state.partner1}: ${realP1Pct}% (${formatBRL(totalIncomeP1)})</span>
+                    <span class="text-sky-300">${state.partner2}: ${realP2Pct}% (${formatBRL(totalIncomeP2)})</span>
+                  </div>
+                  <div class="w-full h-3.5 bg-midnight-950 rounded-full overflow-hidden flex p-0.5 gap-1">
+                    <div class="h-full bg-mint-400 rounded-l-full progress-fill" style="width: ${realP1Pct}%"></div>
+                    <div class="h-full bg-sky-300 rounded-r-full progress-fill" style="width: ${realP2Pct}%"></div>
+                  </div>
+                </div>
+                <div class="space-y-1.5 pt-1">
+                  <div class="flex items-center justify-between text-xs text-slateish">
+                    <span>Meta ${state.partner1}: ${state.targetSplitP1}%</span>
+                    <span>Meta ${state.partner2}: ${100 - state.targetSplitP1}%</span>
+                  </div>
+                  <div class="w-full h-2 bg-midnight-950/60 rounded-full overflow-hidden flex opacity-75">
+                    <div class="h-full bg-mint-400/50 progress-fill" style="width: ${state.targetSplitP1}%"></div>
+                    <div class="h-full bg-sky-300/50 progress-fill" style="width: ${100 - state.targetSplitP1}%"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3.5">
+              <div class="glass-card rounded-3xl p-4 space-y-2">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-7 h-7 rounded-full bg-mint-400 text-midnight-950 text-xs font-medium flex items-center justify-center">${state.partner1.charAt(0)}</div>
+                  <span class="text-xs text-slateish truncate">${renderInlineText('inc_p1_name', state.partner1, `(v)=>commitPartnerName('partner1',v)`)}</span>
+                </div>
+                <p class="text-lg text-offwhite font-light">${formatBRL(totalIncomeP1)}</p>
+                <p class="text-xs text-mint-300">${realP1Pct}% das receitas</p>
+              </div>
+              <div class="glass-card rounded-3xl p-4 space-y-2">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-7 h-7 rounded-full bg-sky-300 text-midnight-950 text-xs font-medium flex items-center justify-center">${state.partner2.charAt(0)}</div>
+                  <span class="text-xs text-slateish truncate">${renderInlineText('inc_p2_name', state.partner2, `(v)=>commitPartnerName('partner2',v)`)}</span>
+                </div>
+                <p class="text-lg text-offwhite font-light">${formatBRL(totalIncomeP2)}</p>
+                <p class="text-xs text-sky-300">${realP2Pct}% das receitas</p>
+              </div>
+            </div>
+
+            <div class="glass-card rounded-3xl p-6 space-y-4">
+              <div class="flex items-center justify-between">
+                <div>
+                  <h3 class="text-base text-offwhite font-normal">Entradas Registradas</h3>
+                  <p class="text-xs text-slateish">Clique nos nomes ou valores para editar</p>
+                </div>
+                <button onclick="setUI({ txModalOpen: true, txType: 'income' })" class="tactile-btn text-xs px-3 py-1.5 rounded-full glass-pill text-mint-300">+ Receita</button>
+              </div>
+              <div class="space-y-3">${incomesListHtml}</div>
+            </div>
+          </section>
+        `;
+      } else if (state.activeTab === 'expenses') {
+        const filtered = m.expenses.filter(e => {
+          if (state.expenseSubfilter !== 'all' && e.type !== state.expenseSubfilter) return false;
+          if (state.splitFilter !== 'all' && e.split !== state.splitFilter) return false;
+          return true;
+        });
+
+        const expItemsHtml = filtered.length === 0
+          ? `<div class="glass-subtle rounded-2xl p-6 text-center space-y-2">
+               <p class="text-xs text-slateish">Nenhuma despesa cadastrada nesta seção.</p>
+               <button onclick="setUI({ txModalOpen: true, txType: 'expense' })" class="text-xs text-mint-300 underline">+ Adicionar primeira despesa</button>
+             </div>`
+          : filtered.map(exp => {
+              const pName = exp.payer === 'P1' ? state.partner1 : state.partner2;
+              const splitLabel = exp.split === '50/50'
+                ? 'Conjunta 50/50 ↻'
+                : exp.split === 'proportional'
+                ? `Proporcional (${state.targetSplitP1}/${100 - state.targetSplitP1}) ↻`
+                : `Individual (${pName}) ↻`;
+              const splitClass = exp.split === '50/50'
+                ? 'bg-mint-400/15 text-mint-300'
+                : exp.split === 'proportional'
+                ? 'bg-sky-400/15 text-sky-300'
+                : 'bg-white/10 text-slateish';
+
+              return `
+                <div class="glass-subtle rounded-2xl p-3.5 space-y-2.5">
+                  <div class="flex items-start justify-between gap-2">
+                    <div>
+                      <p class="text-sm text-offwhite font-normal">
+                        ${renderInlineText(`exp_title_${exp.id}`, exp.title, `(v)=>commitExpenseField('${exp.id}','title',v)`)}
+                      </p>
+                      <p class="text-xs text-slateish">${exp.category} • Pago por ${pName}</p>
+                    </div>
+                    <div class="text-right flex items-center gap-2">
+                      <span class="text-sm text-offwhite font-normal">
+                        ${renderInlineNumber(`exp_amt_${exp.id}`, exp.amount, `(v)=>commitExpenseField('${exp.id}','amount',v)`)}
+                      </span>
+                      <button onclick="deleteExpense('${exp.id}')" class="text-slateish/40 hover:text-coral text-xs px-1">✕</button>
+                    </div>
+                  </div>
+                  <div class="flex items-center justify-between pt-1 border-t border-white/[0.05]">
+                    <button onclick="cycleExpenseSplit('${exp.id}')" class="tactile-btn text-xs px-2 py-0.5 rounded-md ${splitClass}">
+                      ${splitLabel}
+                    </button>
+                    ${
+                      exp.type === 'fixed'
+                        ? `<button onclick="toggleExpensePaid('${exp.id}')" class="tactile-btn text-xs px-2.5 py-1 rounded-full ${exp.paid ? 'bg-mint-400/20 text-mint-300' : 'bg-amberish/20 text-amberish'}">${exp.paid ? '✓ Pago' : `⏳ Dia ${exp.dueDay}`}</button>`
+                        : `<span class="text-xs text-slateish">${exp.date || exp.category}</span>`
+                    }
+                  </div>
+                </div>
+              `;
+            }).join('');
+
+        tabContentHtml = `
+          <section class="tab-fade space-y-5">
+            <div class="glass-card rounded-2xl p-1.5 grid grid-cols-3 gap-1">
+              ${['fixed', 'variable', 'all'].map(k => `
+                <button onclick="setState({ expenseSubfilter: '${k}' })" class="tactile-btn py-2 px-3 rounded-xl text-xs transition-all ${state.expenseSubfilter === k ? 'bg-mint-400 text-midnight-950 font-medium' : 'text-slateish hover:text-offwhite'}">
+                  ${k === 'fixed' ? 'Fixas' : k === 'variable' ? 'Variáveis' : 'Todas'}
+                </button>
+              `).join('')}
+            </div>
+
+            <div class="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+              ${[
+                { id: 'all', l: 'Todas divisões' },
+                { id: '50/50', l: 'Conjunta (50/50)' },
+                { id: 'proportional', l: 'Proporcional' },
+                { id: 'individual', l: 'Individual' }
+              ].map(sp => `
+                <button onclick="setState({ splitFilter: '${sp.id}' })" class="tactile-btn text-xs px-3 py-1.5 rounded-full shrink-0 ${state.splitFilter === sp.id ? 'glass-pill text-mint-300' : 'glass-subtle text-slateish hover:text-offwhite'}">
+                  ${sp.l}
+                </button>
+              `).join('')}
+            </div>
+
+            <div class="glass-card rounded-3xl p-5 space-y-3.5">
+              <div class="flex items-center justify-between">
+                <div>
+                  <h3 class="text-base text-offwhite font-normal">Despesas de ${m.fullName}</h3>
+                  <p class="text-xs text-slateish">Clique nos nomes ou valores para editar</p>
+                </div>
+                <button onclick="setUI({ txModalOpen: true, txType: 'expense' })" class="tactile-btn text-xs px-3 py-1.5 rounded-full glass-pill text-mint-300">+ Despesa</button>
+              </div>
+              <div class="space-y-3">${expItemsHtml}</div>
+            </div>
+
+            <div class="glass-card rounded-3xl p-5 space-y-3">
+              <div class="flex items-center justify-between">
+                <div>
+                  <h4 class="text-sm text-offwhite font-normal">Resumo da Divisão no Mês</h4>
+                  <p class="text-xs text-slateish">Quanto cabe a cada parceiro em tempo real</p>
+                </div>
+                <span class="text-xs px-2.5 py-1 rounded-full glass-subtle text-mint-300">Automático</span>
+              </div>
+              <div class="grid grid-cols-2 gap-3 pt-1">
+                <div class="glass-subtle rounded-2xl p-3.5">
+                  <p class="text-xs text-slateish">Parte de ${state.partner1}</p>
+                  <p class="text-base text-offwhite mt-0.5">${formatBRL(p1Responsibility)}</p>
+                </div>
+                <div class="glass-subtle rounded-2xl p-3.5">
+                  <p class="text-xs text-slateish">Parte de ${state.partner2}</p>
+                  <p class="text-base text-offwhite mt-0.5">${formatBRL(p2Responsibility)}</p>
+                </div>
+              </div>
+            </div>
+          </section>
+        `;
+      } else if (state.activeTab === 'dreams') {
+        const totalSaved = state.goals.reduce((a, g) => a + Number(g.current), 0);
+        const totalTarget = state.goals.reduce((a, g) => a + Number(g.target), 0);
+
+        const fullGoalsHtml = state.goals.map(g => {
+          const pct = Math.min(100, Math.round((g.current / g.target) * 100));
+          const rem = Math.max(0, g.target - g.current);
+          return `
+            <div class="glass-card rounded-3xl p-5 space-y-4">
+              <div class="flex items-start justify-between">
+                <div class="flex items-center gap-3">
+                  <div class="w-11 h-11 rounded-2xl glass-subtle flex items-center justify-center text-xl">${g.icon}</div>
+                  <div>
+                    <h4 class="text-base text-offwhite font-normal">
+                      ${renderInlineText(`dream_title_${g.id}`, g.title, `(v)=>commitGoalField('${g.id}','title',v)`)}
+                    </h4>
+                    <p class="text-xs text-slateish">Prazo: ${g.deadline} • Faltam ${formatBRL(rem)}</p>
+                  </div>
+                </div>
+                <button onclick="deleteGoal('${g.id}')" class="text-xs text-slateish/40 hover:text-coral">✕</button>
+              </div>
+              <div class="w-full h-3 bg-midnight-950 rounded-full overflow-hidden p-0.5">
+                <div class="h-full bg-gradient-to-r from-mint-400 to-teal-300 rounded-full progress-fill" style="width: ${pct}%"></div>
+              </div>
+              <div class="flex items-center justify-between pt-1">
+                <span class="text-xs text-slateish">
+                  Guardado: ${renderInlineNumber(`dream_curr_${g.id}`, g.current, `(v)=>commitGoalField('${g.id}','current',v)`, '', 'text-offwhite font-medium')} de ${renderInlineNumber(`dream_targ_${g.id}`, g.target, `(v)=>commitGoalField('${g.id}','target',v)`)}
+                </span>
+                <div class="flex items-center gap-1.5">
+                  <button onclick="contributeGoal('${g.id}', 100)" class="tactile-btn text-xs px-2.5 py-1 rounded-xl glass-subtle text-mint-300">+ R$ 100</button>
+                  <button onclick="contributeGoal('${g.id}', 500)" class="tactile-btn text-xs px-2.5 py-1 rounded-xl glass-pill text-mint-300">+ R$ 500</button>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        const timelineHtml = Object.keys(state.months).sort().map(key => {
+          const mm = computeMetrics(key);
+          const isCurr = key === state.activeMonthKey;
+          return `
+            <div onclick="setState({ activeMonthKey: '${key}', activeTab: 'home' })" class="tactile-btn cursor-pointer rounded-2xl p-3.5 flex items-center justify-between ${isCurr ? 'glass-pill border-mint-400/40' : 'glass-subtle'}">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-midnight-900 flex items-center justify-center text-xs text-offwhite font-medium">${mm.m.label}</div>
+                <div>
+                  <p class="text-sm text-offwhite font-normal">${mm.m.fullName} ${mm.m.year}</p>
+                  <p class="text-xs text-slateish">Entradas: ${formatBRL(mm.totalIncome)}</p>
+                </div>
+              </div>
+              <div class="text-right">
+                <p class="text-sm text-mint-300">Saldo ${formatBRL(mm.balance)}</p>
+                <p class="text-xs text-slateish">Saídas: ${formatBRL(mm.totalExpense)}</p>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        tabContentHtml = `
+          <section class="tab-fade space-y-6">
+            <div class="glass-card rounded-3xl p-6 space-y-4">
+              <div class="flex items-center justify-between">
+                <div>
+                  <span class="text-xs text-mint-300 uppercase tracking-wider">Nosso Futuro</span>
+                  <h2 class="text-lg text-offwhite font-normal mt-0.5">Metas &amp; Sonhos a Dois</h2>
+                  <p class="text-xs text-slateish">Crie objetivos e acompanhe o progresso</p>
+                </div>
+                <button onclick="setUI({ goalModalOpen: true })" class="tactile-btn text-xs px-3.5 py-2 rounded-full bg-mint-400 text-midnight-950 font-medium">+ Criar Meta</button>
+              </div>
+              <div class="grid grid-cols-2 gap-3 pt-1">
+                <div class="glass-subtle rounded-2xl p-3.5">
+                  <p class="text-xs text-slateish">Total Guardado</p>
+                  <p class="text-lg text-mint-300 font-light mt-0.5">${formatBRL(totalSaved)}</p>
+                </div>
+                <div class="glass-subtle rounded-2xl p-3.5">
+                  <p class="text-xs text-slateish">Objetivo Total</p>
+                  <p class="text-lg text-offwhite font-light mt-0.5">${formatBRL(totalTarget)}</p>
+                </div>
+              </div>
+            </div>
+            <div class="space-y-4">${fullGoalsHtml}</div>
+            <div class="glass-card rounded-3xl p-6 space-y-4">
+              <div class="flex items-center justify-between">
+                <div>
+                  <h3 class="text-base text-offwhite font-normal">Meses &amp; Planejamento Futuro</h3>
+                  <p class="text-xs text-slateish">Gere o próximo mês clonando suas contas fixas</p>
+                </div>
+                <button onclick="setUI({ genMonthModalOpen: true })" class="tactile-btn text-xs px-3 py-1.5 rounded-full glass-pill text-mint-300">+ Gerar Mês</button>
+              </div>
+              <div class="space-y-3">${timelineHtml}</div>
+            </div>
+          </section>
+        `;
+      }
+
+      root.innerHTML = `
+        <div class="hidden sm:flex items-center justify-between w-full max-w-[440px] mb-2.5 px-2 text-xs text-slateish">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-mint-400 animate-pulse"></span>
+            <span>Modo <strong class="text-mint-300 font-normal">Começar do Zero</strong> • Tudo editável</span>
+          </div>
+          <button onclick="resetToZero()" class="hover:text-coral underline">Zerar Tudo</button>
+        </div>
+
+        <div class="w-full max-w-[440px] min-h-screen sm:min-h-[850px] sm:max-h-[900px] bg-midnight-900 sm:rounded-[40px] phone-frame flex flex-col justify-between relative overflow-hidden border-0 sm:border border-white/10">
+          <div class="pointer-events-none absolute -top-24 -left-24 w-72 h-72 rounded-full bg-mint-400/10 blur-3xl"></div>
+          <div class="pointer-events-none absolute top-1/3 -right-28 w-72 h-72 rounded-full bg-sky-400/10 blur-3xl"></div>
+
+          ${!state.onboardingCompleted ? `
+            <div class="absolute inset-0 z-50 bg-midnight-900/95 backdrop-blur-xl p-6 flex flex-col justify-center overflow-y-auto">
+              <div class="glass-card rounded-3xl p-6 space-y-5 tab-fade">
+                <div class="flex items-center gap-3">
+                  <div class="w-11 h-11 rounded-2xl bg-mint-400 text-midnight-950 flex items-center justify-center text-lg font-semibold shadow-lg shadow-mint-400/20">♥</div>
+                  <div>
+                    <span class="text-xs uppercase tracking-widest text-mint-300">Boas-vindas ao Nós Dois</span>
+                    <h2 class="text-lg text-offwhite font-normal">Vamos configurar o casal</h2>
+                  </div>
+                </div>
+                <p class="text-xs text-slateish leading-relaxed">
+                  Defina os nomes de vocês, a proporção combinada e o teto de gastos mensais para começar do zero. Você também pode editar qualquer nome ou valor depois clicando direto nele!
+                </p>
+                <form onsubmit="handleOnboardingSubmit(event)" class="space-y-4">
+                  <div class="grid grid-cols-2 gap-3">
+                    <div>
+                      <label class="block text-xs text-slateish mb-1">Seu Nome</label>
+                      <input id="onbP1Input" type="text" required placeholder="Ex: Ana" class="w-full rounded-2xl bg-midnight-950 border border-white/10 px-3.5 py-2.5 text-sm text-offwhite focus:outline-none focus:border-mint-400" />
+                    </div>
+                    <div>
+                      <label class="block text-xs text-slateish mb-1">Parceiro(a)</label>
+                      <input id="onbP2Input" type="text" required placeholder="Ex: Pedro" class="w-full rounded-2xl bg-midnight-950 border border-white/10 px-3.5 py-2.5 text-sm text-offwhite focus:outline-none focus:border-mint-400" />
+                    </div>
+                  </div>
+                  <div class="space-y-1.5">
+                    <div class="flex justify-between text-xs">
+                      <span class="text-slateish">Divisão Proporcional Combinada</span>
+                      <span id="onbSplitLabel" class="text-mint-300 font-medium">50% / 50%</span>
+                    </div>
+                    <input id="onbSplitInput" type="range" min="10" max="90" step="5" value="50" oninput="document.getElementById('onbSplitLabel').textContent = this.value + '% / ' + (100 - this.value) + '%'" class="w-full accent-mint-400 cursor-pointer" />
+                  </div>
+                  <div>
+                    <label class="block text-xs text-slateish mb-1">Teto Mensal Planejado de Gastos (R$ - Opcional)</label>
+                    <input id="onbCeilingInput" type="number" step="100" min="0" placeholder="Ex: 5000 (ou deixe em branco)" class="w-full rounded-2xl bg-midnight-950 border border-white/10 px-3.5 py-2.5 text-sm text-offwhite focus:outline-none focus:border-mint-400" />
+                  </div>
+                  <button type="submit" class="tactile-btn w-full py-3.5 rounded-2xl bg-mint-400 text-midnight-950 font-medium text-sm shadow-lg shadow-mint-400/25">
+                    Começar Nosso Planejamento →
+                  </button>
+                </form>
+              </div>
+            </div>
+          ` : ''}
+
+          <header class="pt-5 pb-3 px-6 z-20 bg-midnight-900/85 backdrop-blur-md sticky top-0 border-b border-white/[0.05]">
+            <div class="flex items-center justify-between mb-4">
+              <div class="flex items-center gap-3">
+                <button onclick="setUI({ coupleModalOpen: true })" class="tactile-btn flex -space-x-2.5 items-center" title="Editar nomes e acordo">
+                  <div class="w-9 h-9 rounded-full bg-gradient-to-br from-mint-400 to-teal-600 text-midnight-950 font-medium text-xs flex items-center justify-center ring-2 ring-midnight-900">${state.partner1.charAt(0).toUpperCase()}</div>
+                  <div class="w-9 h-9 rounded-full bg-gradient-to-br from-sky-300 to-indigo-500 text-midnight-950 font-medium text-xs flex items-center justify-center ring-2 ring-midnight-900">${state.partner2.charAt(0).toUpperCase()}</div>
+                </button>
+                <div>
+                  <div class="flex items-center gap-1.5 text-base tracking-tight text-offwhite font-normal">
+                    ${renderInlineText('hdr_p1', state.partner1, `(v)=>commitPartnerName('partner1',v)`)}
+                    <span class="text-mint-400 text-xs">&amp;</span>
+                    ${renderInlineText('hdr_p2', state.partner2, `(v)=>commitPartnerName('partner2',v)`)}
+                  </div>
+                  <p class="text-xs text-slateish">Clique nos nomes ou valores p/ editar</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <button onclick="setState({ privacyMode: !state.privacyMode })" class="tactile-btn w-9 h-9 rounded-full glass-subtle flex items-center justify-center text-xs">${state.privacyMode ? '🙈' : '👁️'}</button>
+                <button onclick="setUI({ txModalOpen: true, txType: state.activeTab === 'income' ? 'income' : 'expense' })" class="tactile-btn h-9 px-3.5 rounded-full bg-mint-400 text-midnight-950 text-xs font-medium flex items-center gap-1 shadow-lg shadow-mint-400/20">
+                  <span>+ Lançar</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+              ${monthPillsHtml}
+              <button onclick="setUI({ genMonthModalOpen: true })" class="tactile-btn px-3.5 py-1.5 rounded-full text-xs glass-pill text-mint-300 shrink-0">
+                + ${nextMeta.label}/${String(nextMeta.year).slice(-2)}
+              </button>
+            </div>
+          </header>
+
+          <main class="flex-1 overflow-y-auto no-scrollbar px-6 pt-5 pb-28 space-y-6 z-10">
+            ${tabContentHtml}
+          </main>
+
+          <nav class="glass-card border-t border-white/10 px-4 py-2.5 flex items-center justify-around z-30 sticky bottom-0 bg-midnight-950/90 backdrop-blur-xl">
+            ${[
+              { id: 'home', label: 'Visão Geral', icon: '🏠' },
+              { id: 'income', label: 'Entradas', icon: '🌱' },
+              { id: 'expenses', label: 'Despesas', icon: '📊' },
+              { id: 'dreams', label: 'Sonhos & Meses', icon: '✨' }
+            ].map(t => `
+              <button onclick="setState({ activeTab: '${t.id}' })" class="tactile-btn flex flex-col items-center gap-1 py-1 px-3 rounded-2xl ${state.activeTab === t.id ? 'text-mint-400 font-medium' : 'text-slateish hover:text-offwhite'}">
+                <span class="text-base">${t.icon}</span>
+                <span class="text-xs">${t.label}</span>
+              </button>
+            `).join('')}
+          </nav>
+
+          ${uiState.txModalOpen ? `
+            <div class="absolute inset-0 z-50 bg-midnight-950/80 backdrop-blur-md flex items-end justify-center p-0 sm:p-4">
+              <div class="w-full bg-midnight-800 border border-white/10 rounded-t-3xl sm:rounded-3xl p-6 space-y-4 tab-fade">
+                <div class="flex items-center justify-between">
+                  <h3 class="text-base text-offwhite font-normal">Novo Lançamento em ${m.fullName}</h3>
+                  <button onclick="setUI({ txModalOpen: false })" class="w-8 h-8 rounded-full glass-subtle flex items-center justify-center text-slateish">✕</button>
+                </div>
+                <div class="grid grid-cols-2 gap-2 p-1 rounded-2xl bg-midnight-950/60">
+                  <button type="button" onclick="setUI({ txType: 'expense' })" class="py-2 rounded-xl text-xs ${uiState.txType === 'expense' ? 'bg-mint-400 text-midnight-950 font-medium' : 'text-slateish'}">Despesa</button>
+                  <button type="button" onclick="setUI({ txType: 'income' })" class="py-2 rounded-xl text-xs ${uiState.txType === 'income' ? 'bg-mint-400 text-midnight-950 font-medium' : 'text-slateish'}">Entrada / Receita</button>
+                </div>
+                <form onsubmit="handleNewTxSubmit(event)" class="space-y-3.5">
+                  <div>
+                    <label class="block text-xs text-slateish mb-1">Descrição</label>
+                    <input id="txTitleInput" type="text" required placeholder="${uiState.txType === 'income' ? 'Ex: Salário, Freela...' : 'Ex: Aluguel, Mercado, Luz...'}" class="w-full rounded-2xl bg-midnight-900 border border-white/10 px-4 py-2 text-sm text-offwhite focus:outline-none focus:border-mint-400" />
+                  </div>
+                  <div class="grid grid-cols-2 gap-3">
+                    <div>
+                      <label class="block text-xs text-slateish mb-1">Valor (R$)</label>
+                      <input id="txAmountInput" type="number" step="0.01" min="0.01" required placeholder="0,00" class="w-full rounded-2xl bg-midnight-900 border border-white/10 px-4 py-2 text-sm text-offwhite focus:outline-none focus:border-mint-400" />
+                    </div>
+                    <div>
+                      <label class="block text-xs text-slateish mb-1">${uiState.txType === 'income' ? 'Quem recebeu' : 'Quem lançou'}</label>
+                      <select id="txPartnerInput" class="w-full rounded-2xl bg-midnight-900 border border-white/10 px-3 py-2 text-sm text-offwhite">
+                        <option value="P1">${state.partner1}</option>
+                        <option value="P2">${state.partner2}</option>
+                      </select>
+                    </div>
+                  </div>
+                  ${uiState.txType === 'expense' ? `
+                    <div class="grid grid-cols-2 gap-3">
+                      <div>
+                        <label class="block text-xs text-slateish mb-1">Natureza</label>
+                        <select onchange="setUI({ txSubType: this.value })" class="w-full rounded-2xl bg-midnight-900 border border-white/10 px-3 py-2 text-sm text-offwhite">
+                          <option value="fixed" ${uiState.txSubType === 'fixed' ? 'selected' : ''}>Fixa</option>
+                          <option value="variable" ${uiState.txSubType === 'variable' ? 'selected' : ''}>Variável</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label class="block text-xs text-slateish mb-1">Categoria</label>
+                        <select id="txCategoryInput" class="w-full rounded-2xl bg-midnight-900 border border-white/10 px-3 py-2 text-sm text-offwhite">
+                          <option value="Moradia">Moradia</option>
+                          <option value="Mercado">Mercado</option>
+                          <option value="Lazer">Lazer</option>
+                          <option value="Assinaturas">Assinaturas</option>
+                          <option value="Imprevistos">Imprevistos</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-slateish mb-1">Divisão</label>
+                      <div class="grid grid-cols-3 gap-2">
+                        ${['50/50', 'proportional', 'individual'].map(sp => `
+                          <button type="button" onclick="setUI({ txSplit: '${sp}' })" class="py-2 px-2 rounded-xl text-xs border ${uiState.txSplit === sp ? 'border-mint-400 bg-mint-400/15 text-mint-300' : 'border-white/10 bg-midnight-900 text-slateish'}">
+                            ${sp === '50/50' ? '50/50' : sp === 'proportional' ? 'Proporcional' : 'Individual'}
+                          </button>
+                        `).join('')}
+                      </div>
+                    </div>
+                  ` : ''}
+                  <button type="submit" class="tactile-btn w-full py-3 rounded-2xl bg-mint-400 text-midnight-950 font-medium text-sm">Salvar Lançamento</button>
+                </form>
+              </div>
+            </div>
+          ` : ''}
+
+          ${uiState.coupleModalOpen ? `
+            <div class="absolute inset-0 z-50 bg-midnight-950/80 backdrop-blur-md flex items-center justify-center p-4">
+              <div class="w-full bg-midnight-800 border border-white/10 rounded-3xl p-6 space-y-4 tab-fade">
+                <div class="flex items-center justify-between">
+                  <h3 class="text-base text-offwhite font-normal">Editar Nomes &amp; Acordo</h3>
+                  <button onclick="setUI({ coupleModalOpen: false })" class="w-8 h-8 rounded-full glass-subtle flex items-center justify-center text-slateish">✕</button>
+                </div>
+                <form onsubmit="handleCoupleSubmit(event)" class="space-y-4">
+                  <div class="grid grid-cols-2 gap-3">
+                    <div>
+                      <label class="block text-xs text-slateish mb-1">Parceiro(a) 1</label>
+                      <input id="cpP1Input" type="text" value="${state.partner1}" required class="w-full rounded-2xl bg-midnight-900 border border-white/10 px-3.5 py-2 text-sm text-offwhite" />
+                    </div>
+                    <div>
+                      <label class="block text-xs text-slateish mb-1">Parceiro(a) 2</label>
+                      <input id="cpP2Input" type="text" value="${state.partner2}" required class="w-full rounded-2xl bg-midnight-900 border border-white/10 px-3.5 py-2 text-sm text-offwhite" />
+                    </div>
+                  </div>
+                  <div>
+                    <label class="block text-xs text-slateish mb-1">Proporção de ${state.partner1} (%)</label>
+                    <input id="cpSplitInput" type="number" min="10" max="90" value="${state.targetSplitP1}" class="w-full rounded-2xl bg-midnight-900 border border-white/10 px-3.5 py-2 text-sm text-offwhite" />
+                  </div>
+                  <div>
+                    <label class="block text-xs text-slateish mb-1">Teto Planejado de ${m.fullName} (R$)</label>
+                    <input id="cpCeilInput" type="number" step="100" value="${m.ceiling}" class="w-full rounded-2xl bg-midnight-900 border border-white/10 px-3.5 py-2 text-sm text-offwhite" />
+                  </div>
+                  <button type="submit" class="tactile-btn w-full py-3 rounded-2xl bg-mint-400 text-midnight-950 font-medium text-sm">Salvar Alterações</button>
+                </form>
+              </div>
+            </div>
+          ` : ''}
+
+          ${uiState.goalModalOpen ? `
+            <div class="absolute inset-0 z-50 bg-midnight-950/80 backdrop-blur-md flex items-center justify-center p-4">
+              <div class="w-full bg-midnight-800 border border-white/10 rounded-3xl p-6 space-y-4 tab-fade">
+                <div class="flex items-center justify-between">
+                  <h3 class="text-base text-offwhite font-normal">Criar Meta do Casal</h3>
+                  <button onclick="setUI({ goalModalOpen: false })" class="w-8 h-8 rounded-full glass-subtle flex items-center justify-center text-slateish">✕</button>
+                </div>
+                <form onsubmit="handleGoalSubmit(event)" class="space-y-4">
+                  <div>
+                    <label class="block text-xs text-slateish mb-1">Nome da Meta / Sonho</label>
+                    <input id="glTitleInput" type="text" required placeholder="Ex: Viagem, Reserva, Reforma..." class="w-full rounded-2xl bg-midnight-900 border border-white/10 px-3.5 py-2 text-sm text-offwhite" />
+                  </div>
+                  <div class="grid grid-cols-2 gap-3">
+                    <div>
+                      <label class="block text-xs text-slateish mb-1">Valor Alvo (R$)</label>
+                      <input id="glTargetInput" type="number" required placeholder="10000" class="w-full rounded-2xl bg-midnight-900 border border-white/10 px-3.5 py-2 text-sm text-offwhite" />
+                    </div>
+                    <div>
+                      <label class="block text-xs text-slateish mb-1">Já Guardado (R$)</label>
+                      <input id="glCurrentInput" type="number" value="0" class="w-full rounded-2xl bg-midnight-900 border border-white/10 px-3.5 py-2 text-sm text-offwhite" />
+                    </div>
+                  </div>
+                  <div>
+                    <label class="block text-xs text-slateish mb-1">Prazo desejado</label>
+                    <input id="glDeadlineInput" type="text" placeholder="Ex: Dezembro 2027" class="w-full rounded-2xl bg-midnight-900 border border-white/10 px-3.5 py-2 text-sm text-offwhite" />
+                  </div>
+                  <button type="submit" class="tactile-btn w-full py-3 rounded-2xl bg-mint-400 text-midnight-950 font-medium text-sm">Criar Meta</button>
+                </form>
+              </div>
+            </div>
+          ` : ''}
+
+          ${uiState.genMonthModalOpen ? `
+            <div class="absolute inset-0 z-50 bg-midnight-950/85 backdrop-blur-md flex items-center justify-center p-4">
+              <div class="w-full bg-midnight-800 border border-white/10 rounded-3xl p-6 space-y-4 tab-fade">
+                <div class="flex items-center justify-between">
+                  <h3 class="text-base text-offwhite font-normal">Planejar ${nextMeta.fullName} ${nextMeta.year}</h3>
+                  <button onclick="setUI({ genMonthModalOpen: false })" class="w-8 h-8 rounded-full glass-subtle flex items-center justify-center text-slateish">✕</button>
+                </div>
+                <form onsubmit="handleGenMonthSubmit(event)" class="space-y-3.5">
+                  <label class="glass-subtle rounded-2xl p-3 flex items-center gap-3 cursor-pointer text-xs">
+                    <input id="gmCloneFixed" type="checkbox" checked class="accent-mint-400" />
+                    <span>Clonar Despesas Fixas deste mês (como Pendentes)</span>
+                  </label>
+                  <label class="glass-subtle rounded-2xl p-3 flex items-center gap-3 cursor-pointer text-xs">
+                    <input id="gmCloneIncome" type="checkbox" checked class="accent-mint-400" />
+                    <span>Repetir Entradas deste mês</span>
+                  </label>
+                  <button type="submit" class="tactile-btn w-full py-3 rounded-2xl bg-mint-400 text-midnight-950 font-medium text-sm">Criar e Abrir ${nextMeta.fullName}</button>
+                </form>
+              </div>
+            </div>
+          ` : ''}
+
+          ${uiState.toastMsg ? `
+            <div class="pointer-events-none absolute bottom-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-full bg-mint-400 text-midnight-950 text-xs font-medium shadow-xl whitespace-nowrap">
+              ${uiState.toastMsg}
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    window.addEventListener('DOMContentLoaded', () => { renderApp(); });
+  </script>
+</body>
+</html>
