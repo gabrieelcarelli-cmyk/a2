@@ -1,0 +1,22 @@
+{
+  "background_color": "#ffffff",
+  "dir": "ltr",
+  "display": "standalone",
+  "name": "gabrieelcarelli-cmyk.github",
+  "orientation": "any",
+  "scope": "/aw2",
+  "short_name": "gabrieelcarelli-cmyk.github",
+  "start_url": "/a2",
+  "theme_color": "#ffffff",
+  "id": "A2",
+  "description": "A2 para casal",
+  "lang": "pt",
+  "categories": [
+    "business",
+    "development",
+    "finance",
+    "health",
+    "lifestyle",
+    "utilities"
+  ]
+}
